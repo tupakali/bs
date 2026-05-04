@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BS Ranked Voice</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #07070f;
+      --purple: #7c3aed;
+      --purple-light: #a855f7;
+      --accent: #c084fc;
+      --blue: #2563eb;
+      --blue-light: #3b82f6;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+    }
+
+    #cvs {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ===== IDLE ===== */
+    #idle {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+      transition: opacity .4s, transform .4s;
+    }
+    #idle.hidden { opacity: 0; transform: scale(.93); pointer-events: none; }
+
+    .idle-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(2.2rem, 7vw, 3.8rem);
+      font-weight: 900;
+      letter-spacing: 2px;
+      color: #fff;
+      text-align: center;
+      text-shadow: 0 0 50px rgba(168,85,247,.5);
+    }
+    .idle-title span { color: var(--accent); }
+
+    .idle-sub {
+      font-size: .72rem;
+      letter-spacing: 4px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .pulse-wrap {
+      position: relative;
+      width: 190px; height: 190px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .pr {
+      position: absolute; border-radius: 50%;
+      border: 1px solid rgba(168,85,247,.22);
+      animation: pring 2.8s ease-in-out infinite;
+    }
+    .pr:nth-child(1) { width: 122px; height: 122px; }
+    .pr:nth-child(2) { width: 152px; height: 152px; animation-delay: .7s; }
+    .pr:nth-child(3) { width: 182px; height: 182px; animation-delay: 1.4s; }
+
+    @keyframes pring {
+      0%,100% { opacity: .5; transform: scale(1); }
+      50%      { opacity: .07; transform: scale(1.04); }
+    }
+
+    #startBtn {
+      position: relative; z-index: 2;
+      width: 96px; height: 96px;
+      border-radius: 50%;
+      border: 2px solid var(--purple);
+      background: radial-gradient(circle at 38% 35%, #1e1040, #070710);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform .2s, box-shadow .2s;
+      box-shadow: 0 0 40px rgba(124,58,237,.55), inset 0 0 20px rgba(168,85,247,.12);
+    }
+    #startBtn:hover { transform: scale(1.1); box-shadow: 0 0 65px rgba(124,58,237,.75); }
+    #startBtn:active { transform: scale(.95); }
+
+    .idle-hint { font-size: .68rem; color: var(--muted); letter-spacing: 1.5px; text-align: center; }
+
+    /* ===== VOICE SCREEN ===== */
+    #voice {
+      position: fixed; inset: 0; z-index: 10;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 2.4rem; padding: 2rem;
+      opacity: 0; pointer-events: none;
+      transition: opacity .4s, transform .4s;
+      transform: scale(1.04);
+    }
+    #voice.visible { opacity: 1; pointer-events: all; transform: scale(1); }
+
+    .speakers {
+      display: flex; align-items: center; justify-content: center;
+      gap: clamp(2rem, 9vw, 5rem);
+    }
+
+    .spk { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+
+    .spk-icon {
+      width: 96px; height: 96px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; transition: transform .3s;
+    }
+    .spk-icon svg { position: relative; z-index: 1; }
+
+    .spk-ring {
+      position: absolute; inset: -12px; border-radius: 50%;
+      border: 2px solid transparent; opacity: 0; transition: opacity .3s;
+    }
+
+    #uIcon { background: radial-gradient(circle at 38% 32%, #1a3560, #060e20); border: 2px solid var(--blue); color: var(--blue-light); }
+    #uIcon .spk-ring { border-color: var(--blue-light); }
+
+    #aIcon { background: radial-gradient(circle at 38% 32%, #3a1060, #110620); border: 2px solid var(--purple); color: var(--purple-light); }
+    #aIcon .spk-ring { border-color: var(--accent); }
+
+    .spk-icon.on { animation: spkPop .85s ease-in-out infinite alternate; }
+    .spk-icon.on .spk-ring { opacity: 1; animation: spkRing 1.7s linear infinite; }
+
+    @keyframes spkPop { from{transform:scale(1);} to{transform:scale(1.2);} }
+    @keyframes spkRing {
+      from { transform: rotate(0deg) scale(1); opacity: .85; }
+      50%  { transform: rotate(180deg) scale(1.1); opacity: .25; }
+      to   { transform: rotate(360deg) scale(1); opacity: .85; }
+    }
+
+    .spk-label {
+      font-family: 'Orbitron', sans-serif;
+      font-size: .57rem; letter-spacing: 3px; color: var(--muted);
+      transition: color .3s;
+    }
+    .spk-label.on { color: var(--accent); }
+
+    .vs-txt { font-family: 'Orbitron', sans-serif; font-size: .95rem; color: #1e1e30; font-weight: 900; }
+
+    /* Wave */
+    #wave {
+      display: flex; align-items: center; justify-content: center;
+      gap: 3px; height: 48px; width: min(380px, 90vw);
+    }
+
+    .bar {
+      width: 4px; background: var(--purple); border-radius: 2px; height: 5px;
+      transition: background .3s;
+    }
+    .bar.on { animation: barUp var(--bd,.55s) ease-in-out infinite alternate; animation-delay: var(--boff,0s); }
+    @keyframes barUp { from{height:4px;} to{height:var(--bh,30px);} }
+
+    /* Transcript */
+    #tr {
+      width: min(500px, 90vw); min-height: 72px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(124,58,237,.2);
+      border-radius: 16px; padding: 1rem 1.4rem;
+      font-size: .9rem; color: #94a3b8; line-height: 1.6;
+      text-align: center; transition: border-color .3s, color .3s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #tr.tu { color: #93c5fd; border-color: rgba(59,130,246,.4); }
+    #tr.ta { color: var(--accent); border-color: rgba(168,85,247,.4); }
+
+    #st { font-family:'Orbitron',sans-serif; font-size:.57rem; letter-spacing:2.5px; color:#252535; min-height:14px; }
+
+    #endBtn {
+      padding: .55rem 1.6rem; border-radius: 50px;
+      border: 1px solid rgba(239,68,68,.35);
+      background: rgba(239,68,68,.07); color: #f87171;
+      font-family: 'Orbitron', sans-serif; font-size: .6rem;
+      letter-spacing: 2px; cursor: pointer; transition: background .2s;
+    }
+    #endBtn:hover { background: rgba(239,68,68,.2); }
+
+    /* Dots */
+    .dots { display:inline-flex; gap:5px; align-items:center; }
+    .dots span {
+      width:7px; height:7px; border-radius:50%; background:var(--accent);
+      animation: db 1.2s ease-in-out infinite;
+    }
+    .dots span:nth-child(2){animation-delay:.2s;}
+    .dots span:nth-child(3){animation-delay:.4s;}
+    @keyframes db { 0%,80%,100%{transform:scale(.55);opacity:.35;} 40%{transform:scale(1);opacity:1;} }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 2rem; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.4);
+      border-radius: 10px; padding: .6rem 1.2rem;
+      font-size: .8rem; color: #f87171;
+      opacity: 0; transition: opacity .3s, transform .3s;
+      pointer-events: none; z-index: 99; white-space: nowrap;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<canvas id="cvs"></canvas>
+
+<!-- IDLE -->
+<div id="idle">
+  <div class="idle-title">BS <span>Ranked</span><br/>Voice</div>
+  <p class="idle-sub">ГОЛОСОВОЙ ИИ СОВЕТНИК</p>
+  <div class="pulse-wrap">
+    <div class="pr"></div><div class="pr"></div><div class="pr"></div>
+    <button id="startBtn" onclick="startChat()">
+      <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="1.5" stroke-linecap="round">
+        <path d="M12 1a3 3 0 0 1 3 3v8a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
+      </svg>
+    </button>
+  </div>
+  <p class="idle-hint">Нажми — и базарьте по зонку</p>
+</div>
+
+<!-- VOICE -->
+<div id="voice">
+  <div class="speakers">
+    <div class="spk">
+      <div class="spk-icon" id="uIcon">
+        <div class="spk-ring"></div>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <path d="M12 1a3 3 0 0 1 3 3v8a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
+        </svg>
+      </div>
+      <span class="spk-label" id="uLbl">ТЫ</span>
+    </div>
+
+    <div class="vs-txt">VS</div>
+
+    <div class="spk">
+      <div class="spk-icon" id="aIcon">
+        <div class="spk-ring"></div>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <rect x="3" y="8" width="18" height="10" rx="3"/>
+          <path d="M7 8V6a5 5 0 0 1 10 0v2"/>
+          <circle cx="9" cy="13" r="1.2" fill="currentColor"/>
+          <circle cx="15" cy="13" r="1.2" fill="currentColor"/>
+        </svg>
+      </div>
+      <span class="spk-label" id="aLbl">ИИ</span>
+    </div>
+  </div>
+
+  <div id="wave"></div>
+  <div id="tr">Говори — кого пикнуть...</div>
+  <div id="st"></div>
+  <button id="endBtn" onclick="endChat()">ЗАВЕРШИТЬ</button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* PARTICLES */
+const cvs=document.getElementById('cvs'),ctx=cvs.getContext('2d');
+let W,H,pts=[];
+function rsz(){W=cvs.width=innerWidth;H=cvs.height=innerHeight;}
+function mkP(){return{x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.4+.3,vx:(Math.random()-.5)*.28,vy:(Math.random()-.5)*.28,a:Math.random()*.45+.08};}
+rsz();pts=Array.from({length:100},mkP);
+window.addEventListener('resize',rsz);
+(function loop(){
+  ctx.clearRect(0,0,W,H);
+  pts.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;
+    if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(168,85,247,${p.a})`;ctx.fill();
+  });
+  requestAnimationFrame(loop);
+})();
+
+/* WAVE BARS */
+const waveEl=document.getElementById('wave');
+for(let i=0;i<24;i++){
+  const b=document.createElement('div');b.className='bar';
+  b.style.setProperty('--bd',(.38+Math.random()*.45)+'s');
+  b.style.setProperty('--bh',(8+Math.floor(Math.random()*30))+'px');
+  b.style.setProperty('--boff',(Math.random()*.4)+'s');
+  waveEl.appendChild(b);
+}
+
+function wave(who){
+  document.querySelectorAll('.bar').forEach(b=>{
+    b.classList.toggle('on',who!=='off');
+    b.style.background=who==='user'?'#3b82f6':'#a855f7';
+  });
+}
+
+function setActive(who){
+  const u=['uIcon','uLbl'],a=['aIcon','aLbl'];
+  u.forEach(id=>document.getElementById(id).classList.toggle('on',who==='user'));
+  a.forEach(id=>document.getElementById(id).classList.toggle('on',who==='ai'));
+}
+
+function setTr(text,who){
+  const el=document.getElementById('tr');
+  el.innerHTML=text==='__load__'?'<span class="dots"><span></span><span></span><span></span></span>':text;
+  el.className=who==='user'?'tu':who==='ai'?'ta':'';
+}
+
+function setSt(t){document.getElementById('st').textContent=t;}
+
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3500);
+}
+
+/* GROQ */
+const GROQ_KEY='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';
+const SYSTEM=`Ты топовый эксперт по Brawl Stars Ranked Mode (май 2026). Отвечай только на русском. Говори коротко, живо, как тренер — без маркдауна, без звёздочек, просто текст. Используй английские имена бравлеров.
+
+Мета май 2026:
+S+ тир: Najia, Bull, Bibi, Mortis, Angelo, Crow
+S тир: Max, Byron, Melodie, Damian, Colt, Gene, Pam
+A тир: Sandy, Tara, Gus, Frank, Buzz, El Primo, Belle, Piper, Brock, Hank, Janet, Kenji, Spike, Leon, Lumi
+B тир: Poco, Nita, Bo, Rico, Colette, Chester, Gray, Emz
+
+Каунтеры: Bull и El Primo убивают Gene, Pam, Byron. Angelo бьёт медленных и танков. Mortis убивает Byron и медленных саппортов. Frank контрится Mortis, Leon, Crow.
+
+Правила драфта: первый пик — универсал. Ласт пик — закрой дыры и контрь весь состав врага. Предлагай 2–3 варианта с коротким объяснением.`;
+
+let history=[];
+
+async function callGroq(text){
+  history.push({role:'user',content:text});
+  const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+GROQ_KEY},
+    body:JSON.stringify({
+      model:'llama-3.3-70b-versatile',
+      messages:[{role:'system',content:SYSTEM},...history],
+      max_tokens:500,temperature:0.5
+    })
+  });
+  const d=await r.json();
+  const ans=d.choices?.[0]?.message?.content||'Нет ответа';
+  history.push({role:'assistant',content:ans});
+  return ans;
+}
+
+/* SPEECH */
+let recog=null,isListening=false,isSpeaking=false,active=true;
+
+if(window.speechSynthesis){
+  speechSynthesis.getVoices();
+  speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices();
+}
+
+function speak(text,onDone){
+  if(!window.speechSynthesis){onDone&&onDone();return;}
+  speechSynthesis.cancel();
+  const clean=text.replace(/[*#_~`•]/g,'').replace(/\n+/g,'. ');
+  const utt=new SpeechSynthesisUtterance(clean);
+  utt.lang='ru-RU';utt.rate=1.05;
+  const rv=speechSynthesis.getVoices().find(v=>v.lang.startsWith('ru'));
+  if(rv)utt.voice=rv;
+  isSpeaking=true;
+  setActive('ai');wave('ai');setSt('ГОВОРИТ ИИ');setTr(text,'ai');
+  utt.onend=()=>{isSpeaking=false;onDone&&onDone();};
+  utt.onerror=()=>{isSpeaking=false;onDone&&onDone();};
+  speechSynthesis.speak(utt);
+}
+
+function listen(){
+  if(!active)return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('Нужен Chrome!');return;}
+
+  recog=new SR();
+  recog.lang='ru-RU';
+  recog.interimResults=true;
+  recog.continuous=false;
+
+  recog.onstart=()=>{
+    isListening=true;
+    setActive('user');wave('user');
+    setTr('Слушаю...','user');setSt('● ЗАПИСЬ');
+  };
+
+  recog.onresult=e=>{
+    let fin='',int='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const t=e.results[i][0].transcript;
+      if(e.results[i].isFinal)fin+=t;else int+=t;
+    }
+    setTr(fin||int,'user');
+  };
+
+  recog.onend=()=>{
+    isListening=false;
+    if(!active)return;
+    const said=document.getElementById('tr').textContent.trim();
+    if(!said||said==='Слушаю...'||said.length<3){
+      setActive('none');wave('off');
+      setTr('Не расслышал, говори...','');setSt('');
+      setTimeout(listen,700);
+      return;
+    }
+    askAI(said);
+  };
+
+  recog.onerror=e=>{
+    isListening=false;
+    if(!active)return;
+    if(e.error==='not-allowed'){toast('Разреши доступ к микрофону!');endChat();return;}
+    if(e.error==='no-speech'||e.error==='aborted'){setTimeout(listen,600);return;}
+    toast('Ошибка: '+e.error);
+    setTimeout(listen,1000);
+  };
+
+  recog.start();
+}
+
+async function askAI(said){
+  if(!active)return;
+  setActive('ai');wave('ai');
+  setTr('__load__','ai');setSt('ИИ ДУМАЕТ...');
+  try{
+    const ans=await callGroq(said);
+    if(!active)return;
+    speak(ans,()=>{
+      if(!active)return;
+      setActive('none');wave('off');
+      setTr('Говори...','');setSt('Твоя очередь');
+      setTimeout(listen,500);
+    });
+  }catch(err){
+    toast('Ошибка: '+err.message);
+    setTr('Ошибка, пробуем снова...','');
+    setActive('none');wave('off');setSt('');
+    setTimeout(listen,1500);
+  }
+}
+
+function startChat(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('Нужен браузер Chrome!');return;}
+  active=true;history=[];
+  document.getElementById('idle').classList.add('hidden');
+  document.getElementById('voice').classList.add('visible');
+  setActive('none');wave('off');
+  setTr('Говори — кого пикнуть...','');setSt('');
+  setTimeout(listen,700);
+}
+
+function endChat(){
+  active=false;
+  if(recog){try{recog.abort();}catch(e){}recog=null;}
+  if(window.speechSynthesis)speechSynthesis.cancel();
+  isListening=false;isSpeaking=false;
+  setActive('none');wave('off');
+  document.getElementById('voice').classList.remove('visible');
+  document.getElementById('idle').classList.remove('hidden');
+}
+</script>
+</body>
+</html>
